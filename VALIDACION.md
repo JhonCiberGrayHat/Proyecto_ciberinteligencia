@@ -1,5 +1,17 @@
 # Validación realizada
 
+## Reestructuración modular
+
+La versión modular se verificó en Windows con Python 3.13.7, pandas 2.3.3,
+NumPy 2.5.4, scikit-learn 1.8.0, matplotlib 3.11.2 y joblib 1.6.0.
+Las tres pruebas de integración pasaron: entrenamiento multiclase y predicción
+mediante `ids.py`, entrenamiento binario mediante `python -m ids_core`, y
+muestreo con eliminación de conflictos mediante la interfaz compatible.
+También se comprobó la compilación sintáctica y la ayuda de ambas entradas.
+No se descargaron datos de Kaggle ni se validaron métricas con tráfico real.
+
+## Validación anterior a la reestructuración
+
 Fecha: 2 de noviembre de 2026.
 
 Entorno de comprobación: Python 3.12.14, pandas 2.2.3, NumPy 2.3.5,

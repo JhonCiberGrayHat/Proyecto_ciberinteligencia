@@ -48,9 +48,10 @@ class PipelineIntegrationTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def run_cli(self, *args, success=True):
-        result = subprocess.run([sys.executable, str(ROOT / "ids.py"), *map(str, args)],
-                                capture_output=True, text=True)
+    def run_cli(self, *args, success=True, module=False):
+        entry = ["-m", "ids_core"] if module else [str(ROOT / "ids.py")]
+        result = subprocess.run([sys.executable, *entry, *map(str, args)],
+                                capture_output=True, text=True, cwd=ROOT)
         if success:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         else:
@@ -92,7 +93,7 @@ class PipelineIntegrationTests(unittest.TestCase):
         out = self.base / "binary"
         self.run_cli("entrenar", "--data", self.data, "--output", out,
                      "--mode", "binario", "--test-file", "day1.csv",
-                     "--chunk-size", 19, "--trees", 5, "--jobs", 1)
+                     "--chunk-size", 19, "--trees", 5, "--jobs", 1, module=True)
         scores = json.loads((out / "metricas.json").read_text())
         self.assertEqual(scores["train_rows"], 120)
         self.assertEqual(scores["test_rows"], 120)

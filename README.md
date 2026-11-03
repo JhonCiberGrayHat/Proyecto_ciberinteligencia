@@ -3,6 +3,36 @@
 Proyecto experimental de detección de intrusiones sobre los CSV de
 CSE-CIC-IDS2018 publicados en Kaggle. No requiere GPU.
 
+## Organización del código
+
+`ids.py` es el punto de entrada y conserva las funciones públicas anteriores.
+La implementación está dividida en el paquete `ids_core`:
+
+| Módulo | Responsabilidad |
+| --- | --- |
+| `config.py` | Dataset, rutas, registro y columnas reservadas/excluidas |
+| `data.py` | Lectura de CSV por bloques y normalización numérica |
+| `datasets.py` | Descarga de Kaggle e inspección de archivos |
+| `sampling.py` | Muestreo por clase, limpieza y auditoría de la muestra |
+| `training.py` | Partición, ajuste, evaluación y guardado del experimento |
+| `prediction.py` | Carga del modelo e inferencia por bloques |
+| `reporting.py` | Escritura JSON y gráfico de la matriz de confusión |
+| `cli.py` | Argumentos, validación y ejecución de los comandos |
+
+Los módulos de entrenamiento y predicción comparten la lectura y conversión
+de datos. La CLI coordina las operaciones; los módulos de datos no dependen
+de ella. Importar el paquete no ejecuta comandos ni descarga datos.
+
+Se mantienen los comandos `python ids.py ...`; también se puede ejecutar
+`python -m ids_core ...`. Para integrar el muestreo desde Python, use
+`from ids_core.sampling import load_sample`. La función `ids_core.cli.main`
+acepta una lista opcional de argumentos para su ejecución desde otro programa.
+`data_path.txt` sigue ubicado en la raíz del proyecto.
+
+El notebook de `EDA_analisis_modelos` contiene un análisis exploratorio
+independiente (PCA, agrupamiento y comparación de clasificadores); conserva
+su flujo interactivo y no es una dependencia de la aplicación CLI.
+
 Fuente solicitada: https://www.kaggle.com/datasets/solarmainframe/ids-intrusion-csv
 Documentación original: https://www.unb.ca/cic/datasets/ids-2018.html
 Descarga Python: https://github.com/Kaggle/kagglehub
