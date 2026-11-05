@@ -88,6 +88,20 @@ class PipelineIntegrationTests(unittest.TestCase):
         self.assertIn("Faltan variables", result.stderr)
         self.assertFalse((self.base / "bad_out.csv").exists())
         self.assertTrue((out / "matriz_confusion.png").is_file())
+        # Un fallo en el segundo bloque no reemplaza una salida anterior.
+        invalid = new.copy()
+        invalid.loc[3, "Dst Port"] = 70000
+        invalid.loc[4, "Dst Port"] = -1
+        invalid.to_csv(self.base / "invalid.csv", index=False)
+        previous = dest.read_bytes()
+        result = self.run_cli("predecir", "--model", out / "modelo_ids.joblib",
+                             "--csv", self.base / "invalid.csv", "--output", dest,
+                             "--chunk-size", 3, success=False)
+        self.assertIn("Contrato de datos incumplido", result.stderr)
+        self.assertIn("70000", result.stderr)
+        self.assertIn("-1", result.stderr)
+        self.assertEqual(dest.read_bytes(), previous)
+        self.assertFalse(dest.with_suffix(".csv.tmp").exists())
 
     def test_binary_file_holdout(self):
         out = self.base / "binary"

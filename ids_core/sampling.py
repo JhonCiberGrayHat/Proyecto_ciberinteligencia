@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .config import DATASET, EXCLUDE, LOG
+from .contracts import feature_schema, validate_data
 from .data import canonical, chunks, csv_files, header, numeric, resolve_data
 
 
@@ -67,6 +68,9 @@ def load_sample(args):
     conflicts = combined.duplicated(subset=features, keep=False)
     conflict_count = int(conflicts.sum())
     combined = combined.loc[~conflicts].reset_index(drop=True)
+    combined = validate_data(
+        combined, feature_schema(features, labeled=True, mode=args.mode),
+        context="muestra limpia de entrenamiento")
     audit = {"dataset": DATASET, "files": [str(p.resolve()) for p in files],
              "file_sizes_bytes": {str(p.resolve()): p.stat().st_size for p in files},
              "original_labels_observed_after_mode": dict(observed),

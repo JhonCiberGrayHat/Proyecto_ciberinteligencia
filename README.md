@@ -11,6 +11,7 @@ La implementación está dividida en el paquete `ids_core`:
 | Módulo | Responsabilidad |
 | --- | --- |
 | `config.py` | Dataset, rutas, registro y columnas reservadas/excluidas |
+| `contracts.py` | Contratos de tipos y reglas con Pandera y validación LAZY |
 | `data.py` | Lectura de CSV por bloques y normalización numérica |
 | `datasets.py` | Descarga de Kaggle e inspección de archivos |
 | `sampling.py` | Muestreo por clase, limpieza y auditoría de la muestra |
@@ -32,6 +33,47 @@ acepta una lista opcional de argumentos para su ejecución desde otro programa.
 El notebook de `EDA_analisis_modelos` contiene un análisis exploratorio
 independiente (PCA, agrupamiento y comparación de clasificadores); conserva
 su flujo interactivo y no es una dependencia de la aplicación CLI.
+
+### Contrato de datos con Pandera
+
+El contrato dinámico de `ids_core/contracts.py` exige las características
+comunes de entrenamiento o las variables guardadas en el modelo de predicción.
+Se aplica **después de la limpieza numérica**, antes de ajustar el modelo y
+antes de predecir cada bloque. No modifica ni convierte los tipos: exige
+`float32` y valores finitos; permite `NaN` individuales para la imputación,
+pero rechaza filas sin ninguna variable disponible. El texto no numérico,
+infinitos y desbordamientos del CSV siguen convirtiéndose en faltantes durante
+la limpieza previa; el contrato no certifica que esos valores originales sean
+válidos. Las filas completamente vacías se eliminan del entrenamiento y se
+rechazan en predicción.
+
+Los puertos reconocidos (`Dst Port`, `Destination Port`, `Src Port` y
+`Source Port`, ignorando espacios y mayúsculas) deben ser enteros entre 0 y
+65535; `Protocol`, entre 0 y 255. Se permiten valores faltantes en estas
+columnas. Las demás variables no tienen límites físicos específicos definidos.
+En entrenamiento, `Label` debe ser texto no vacío, sin espacios extremos ni
+marcadores reservados; el modo binario permite únicamente `Benign` y `Attack`.
+`__source` exige una procedencia textual no vacía. En predicción, `Label` es
+solo una referencia opcional y no se valida ni se utiliza como predictor.
+
+Todas las validaciones usan `schema.validate(frame, lazy=True)`: Pandera
+acumula los fallos del DataFrame validado en lugar de detenerse en el primero.
+`DataContractError` conserva el detalle en `failure_cases` (columna, índice,
+valor y chequeo) y la CLI lo muestra con código de salida 1. En inferencia,
+los errores se acumulan por bloque; el proceso se detiene en el primer bloque
+inválido y no publica una salida parcial. LAZY no implica lectura diferida
+ni acumulación de errores de todos los archivos.
+
+```python
+from ids_core.contracts import DataContractError, feature_schema, validate_data
+from ids_core.data import numeric
+
+features = ["Dst Port", "Flow Duration"]
+try:
+    validated = validate_data(numeric(frame[features]), feature_schema(features))
+except DataContractError as exc:
+    print(exc.failure_cases)
+```
 
 Fuente solicitada: https://www.kaggle.com/datasets/solarmainframe/ids-intrusion-csv
 Documentación original: https://www.unb.ca/cic/datasets/ids-2018.html

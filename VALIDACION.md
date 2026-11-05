@@ -1,5 +1,19 @@
 # Validación realizada
 
+## Contrato Pandera y validación LAZY — 4 de noviembre de 2026
+
+Con Pandera 0.34.1 en el entorno Windows de la versión modular, pasaron las
+siete pruebas de `python -m unittest discover -s tests -v`.
+Las cuatro pruebas del contrato verifican tipos y reglas simultáneos,
+columnas ausentes, valores infinitos, puertos fraccionarios/fuera de rango,
+protocolo, etiquetas binarias, procedencia y filas sin variables disponibles.
+También comprueban que los faltantes parciales y columnas adicionales se aceptan.
+La integración verifica que un segundo bloque inválido de predicción informa
+varios fallos y conserva la salida anterior, eliminando el temporal.
+Se mantuvieron las pruebas de entrenamiento, predicción y muestreo y se
+verificó la compilación sintáctica. Pandera emitió un FutureWarning interno
+de concatenación de pandas al reunir errores; las comprobaciones pasaron.
+
 ## Reestructuración modular
 
 La versión modular se verificó en Windows con Python 3.13.7, pandas 2.3.3,

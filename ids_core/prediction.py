@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .data import chunks, header, numeric
+from .contracts import feature_schema, validate_data
 
 
 def predict(args):
@@ -23,9 +24,13 @@ def predict(args):
     dest.parent.mkdir(parents=True, exist_ok=True)
     temp = dest.with_suffix(dest.suffix + ".tmp")
     total = 0
+    schema = feature_schema(features)
     try:
         for frame in chunks(source, args.chunk_size):
-            probabilities = model.predict_proba(numeric(frame[features]))
+            values = validate_data(
+                numeric(frame[features]), schema,
+                context=f"{source.name}, registros CSV desde {total + 2}")
+            probabilities = model.predict_proba(values)
             best = probabilities.argmax(axis=1)
             # row_csv es el número lógico de registro (encabezado = 1), no una
             # línea física cuando hay campos multilínea.
