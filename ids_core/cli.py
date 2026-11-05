@@ -39,6 +39,8 @@ def main(argv=None):
     p.add_argument("--jobs", type=int, default=2, help="Hilos CPU; -1 utiliza todos")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output", default="resultados")
+    p.add_argument("--reentrenar", action="store_true",
+                   help="Volver a entrenar y reemplazar el modelo y los reportes existentes")
     p.set_defaults(func=train)
     p = sub.add_parser("predecir", help="Clasificar CSV nuevos con el modelo guardado")
     p.add_argument("--model", default="resultados/modelo_ids.joblib")

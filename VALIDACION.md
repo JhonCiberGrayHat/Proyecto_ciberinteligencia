@@ -1,5 +1,51 @@
 # Validación realizada
 
+## Ejemplos ejecutables del cuerpo de predicción
+
+Pasaron los 14 casos de `pytest tests/test_api.py -q` (2,84 segundos).
+La nueva prueba obtiene los ejemplos de OpenAPI y los envía a `/predict`,
+verificando también la demostración de imputación y los puertos enteros.
+Además se cargó el modelo local `resultados_binario/modelo_ids.joblib`:
+los dos ejemplos generados con sus 70 variables devolvieron HTTP 200 mediante
+TestClient. Los ejemplos usan las medianas serializadas y no reentrenan.
+Persistió la advertencia de deprecación del TestClient de Starlette/HTTPX.
+
+## API FastAPI y Uvicorn
+
+Se ejecutó `.venv\Scripts\python.exe -m pytest -q`: **58 pruebas aprobadas
+en 17,49 segundos** en Windows con FastAPI 0.162.0, Uvicorn 0.54.0 y HTTPX
+0.28.1. Los 13 casos nuevos verifican carga única del modelo, inferencia sin
+`fit`, equivalencia con el pipeline, metadatos, salud, documentación OpenAPI,
+validación de peticiones, errores LAZY múltiples, configuración por variable
+de entorno y rechazo del arranque cuando no existe modelo.
+Las rutas se probaron con `TestClient` y el ciclo de vida completo; se verificó
+también el ejecutable con `python -m uvicorn --version`. No se dejó un servidor
+en ejecución ni se realizaron pruebas de carga o de red con Uvicorn.
+Se registraron dos advertencias de dependencias: concatenación Pandera/pandas
+y deprecación del uso de HTTPX en el TestClient de Starlette.
+
+## Preprocesamiento dentro del modelo serializado
+
+Se ejecutó `.venv\Scripts\python.exe -m pytest -q`: **45 pruebas aprobadas
+en 16,73 segundos**, con una advertencia interna de Pandera/pandas.
+Se comprobó que el pipeline recargado acepta un DataFrame sin preparar,
+normaliza encabezados y orden de variables, convierte tipos, limpia texto,
+infinitos y desbordamientos y conserva las medianas del imputador.
+Las probabilidades coinciden con las obtenidas al aplicar los pasos por
+separado. Se bloquearon los métodos `fit` para confirmar que la inferencia
+no ajusta ningún paso, y se verificó que no modifica el DataFrame original.
+Se comprobó también la predicción con el formato anterior de artefacto.
+
+## Serialización y reutilización del modelo
+
+Se ejecutó `.venv\Scripts\python.exe -m pytest -q`: **43 pruebas aprobadas
+en 15,86 segundos**, con el mismo FutureWarning interno de Pandera/pandas.
+Los siete casos nuevos comprueban reutilización sin CSV de entrenamiento ni
+llamadas a `fit`, predicciones equivalentes a las del pipeline cargado,
+reentrenamiento explícito, rechazo de un modo incompatible, modelos ausentes
+o corruptos, artefactos sin pipeline y conservación del modelo anterior ante
+un fallo de serialización. El modelo y los reportes no cambian al reutilizarlos.
+
 ## Suite pytest — 4 de noviembre de 2026
 
 Se ejecutó `.venv\Scripts\python.exe -m pytest -v` en Windows, con

@@ -12,6 +12,9 @@ La implementación está dividida en el paquete `ids_core`:
 | --- | --- |
 | `config.py` | Dataset, rutas, registro y columnas reservadas/excluidas |
 | `contracts.py` | Contratos de tipos y reglas con Pandera y validación LAZY |
+| `artifacts.py` | Serialización atómica y carga del pipeline entrenado |
+| `preprocessing.py` | Transformador serializable de limpieza y selección de variables |
+| `api.py` | API FastAPI de inferencia con el modelo serializado |
 | `data.py` | Lectura de CSV por bloques y normalización numérica |
 | `datasets.py` | Descarga de Kaggle e inspección de archivos |
 | `sampling.py` | Muestreo por clase, limpieza y auditoría de la muestra |
@@ -125,6 +128,43 @@ sus CSV, incluidas las subcarpetas. No se descarga información al ejecutar
 corresponden únicamente a las primeras 2000 filas, no a todo el conjunto.
 
 ## 3. Entrenar
+
+El entrenamiento se realiza una vez por carpeta `--output`. Guarda en
+`modelo_ids.joblib` el pipeline completo (preprocesador, imputador ajustado y Random Forest),
+las variables en su orden, el modo, la semilla y las versiones. Si el archivo
+ya existe, `entrenar` comprueba que se puede cargar y omite la lectura del
+dataset y el entrenamiento, conservando los reportes existentes.
+
+Para clasificar nuevos CSV, ejecute `predecir` con ese modelo serializado;
+no necesita los CSV de entrenamiento ni volver a calcular la imputación.
+Los parámetros nuevos de entrenamiento no se aplican al modelo existente.
+Para cambiar el modo, los datos o los parámetros, use otra carpeta de salida
+o solicite el reemplazo explícito con `--reentrenar`:
+
+```powershell
+.\.venv\Scripts\python.exe ids.py entrenar --data .\data --output resultados
+.\.venv\Scripts\python.exe ids.py predecir --model .\resultados\modelo_ids.joblib --csv .\nuevos_flujos.csv --output .\predicciones.csv
+# Solo cuando se quiera ajustar de nuevo y reemplazar el experimento:
+.\.venv\Scripts\python.exe ids.py entrenar --data .\data --output resultados --reentrenar
+```
+
+Un modelo ilegible o de un modo distinto produce un error; no se reentrena
+automáticamente. La escritura del modelo utiliza un archivo temporal y un
+reemplazo al completar la serialización. Los reportes se escriben por separado.
+
+El pipeline serializado de los modelos nuevos recibe directamente un DataFrame
+con datos de CSV: normaliza BOM/espacios en encabezados, selecciona y ordena
+las variables guardadas, convierte a `float32`, sustituye texto no numérico,
+infinitos y desbordamientos por `NaN`, y valida el contrato Pandera con LAZY.
+Después aplica las medianas aprendidas en entrenamiento y ejecuta el bosque.
+La inferencia no vuelve a ajustar ninguno de estos pasos. También puede usar
+`load_model(ruta)["model"].predict_proba(frame)` desde Python.
+
+Los artefactos anteriores siguen funcionando mediante la limpieza compatible
+de `predecir`. Para incorporar el preprocesador dentro de esos archivos ya
+existentes, genere una nueva versión con `entrenar --reentrenar`.
+El muestreo, la depuración de etiquetas y la deduplicación son operaciones del
+dataset de entrenamiento; no se aplican a los registros que se van a predecir.
 
 El modo predeterminado conserva las etiquetas originales de ataque:
 
@@ -249,7 +289,64 @@ CICFlowMeter y su configuración, seguida de inferencia, registro y alertas.
 Cambiar el extractor o las unidades requiere verificar compatibilidad y validar
 de nuevo el modelo. Cargue únicamente modelos joblib de fuentes confiables.
 
-## 6. Verificación local
+## 6. API con FastAPI y Uvicorn
+
+Instale las dependencias y ejecute desde la raíz del proyecto. Si ya dispone
+del modelo binario, seleccione su ruta con `IDS_MODEL_PATH`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:IDS_MODEL_PATH = ".\resultados_binario\modelo_ids.joblib"
+.\.venv\Scripts\python.exe -m uvicorn ids_core.api:app --host 127.0.0.1 --port 8000
+```
+
+Sin esa variable se utiliza `resultados/modelo_ids.joblib`. La ruta relativa
+se resuelve desde el directorio de ejecución. El servidor carga el modelo
+una vez por proceso al iniciar; si falta o es inválido, no inicia ni entrena
+automáticamente. Después de reemplazar el modelo, reinicie el servidor.
+La carga utiliza el [ciclo de vida de FastAPI](https://fastapi.tiangolo.com/advanced/events/).
+
+| Endpoint | Función |
+| --- | --- |
+| `GET /health` | Estado del servicio y confirmación del modelo cargado |
+| `GET /model` | Variables requeridas, clases, modo y versión del preprocesamiento |
+| `POST /predict` | Predicciones para un lote JSON de 1 a 1000 registros |
+| `GET /docs` | Documentación interactiva para probar peticiones |
+
+Abra http://127.0.0.1:8000/docs y consulte `GET /model` para conocer los nombres
+exactos de las variables de su modelo. Cada registro debe incluirlas todas;
+use `null` para un valor faltante que deba imputarse. Las columnas adicionales
+se ignoran al predecir. Los tipos, la limpieza y la validación LAZY se aplican
+con el mismo flujo de inferencia utilizado para CSV.
+
+Para una demostración inmediata, despliegue `POST /predict` y pulse **Try it
+out**. El cuerpo del request ya incluye `flujo_demo`, generado con todas las
+variables y las medianas del modelo cargado; pulse **Execute** para predecir.
+El selector de ejemplos también ofrece `imputacion_demo`, un lote de dos
+registros con un `null` para demostrar la imputación (si hay al menos dos
+variables). Los puertos y el protocolo se ajustan a enteros válidos.
+Los ejemplos son sintéticos y no garantizan una predicción Benign o Attack.
+Reinicie Uvicorn para que aparezcan los nuevos ejemplos.
+
+Ejemplo de petición (adapte las variables a las devueltas por `/model`):
+
+```json
+{
+  "records": [
+    {"Dst Port": 443, "Flow Duration": 1200, "Flow Byts/s": null}
+  ]
+}
+```
+
+La respuesta contiene `count` y `predictions`, con `row` (índice desde cero),
+`prediccion` y `score_modelo` por registro. El score conserva el significado
+de probabilidad máxima del bosque sin calibración. Las peticiones inválidas
+devuelven HTTP 422; los fallos Pandera incluyen `detail.failure_cases` con los
+errores acumulados del lote. Una petición no produce resultados parciales.
+La API solo realiza inferencia: la creación y actualización del modelo se
+ejecutan con los comandos de entrenamiento.
+
+## 7. Verificación local
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt

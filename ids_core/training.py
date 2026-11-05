@@ -5,7 +5,6 @@ import json
 import platform
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 import sklearn
@@ -17,11 +16,25 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 from .config import DATASET, LOG
+from .artifacts import MODEL_FILENAME, load_model, save_model
 from .reporting import plot_confusion, write_json
 from .sampling import load_sample
+from .preprocessing import FlowPreprocessor
 
 
 def train(args):
+    out = Path(args.output)
+    model_path = out / MODEL_FILENAME
+    if model_path.exists() and not getattr(args, "reentrenar", False):
+        artifact = load_model(model_path)
+        if artifact["mode"] != args.mode:
+            raise ValueError(
+                f"El modelo existente usa modo {artifact['mode']}. "
+                "Use otra carpeta --output o --reentrenar para cambiarlo.")
+        print(f"Modelo serializado disponible: {model_path.resolve()}")
+        print("Se omite el entrenamiento y la lectura de datos. "
+              "Use predecir --model con esta ruta; para ajustar de nuevo, use --reentrenar.")
+        return
     data, features, audit = load_sample(args)
     if data["Label"].nunique() < 2:
         raise ValueError("Se necesitan al menos dos clases después de limpiar la muestra.")
@@ -50,6 +63,7 @@ def train(args):
     if not features:
         raise ValueError("No hay características numéricas variables en entrenamiento.")
     model = Pipeline([
+        ("preprocessor", FlowPreprocessor(features)),
         ("imputer", SimpleImputer(strategy="median")),
         ("classifier", RandomForestClassifier(
             n_estimators=args.trees, max_depth=24, min_samples_leaf=2,
@@ -78,13 +92,13 @@ def train(args):
     scores["binary_alarm"] = {"TN": int(tn), "FP": int(fp), "FN": int(fn), "TP": int(tp),
         "false_positive_rate": float(fp / (fp + tn)) if fp + tn else None,
         "attack_recall": float(tp / (tp + fn)) if tp + fn else None}
-    out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
     versions = {"python": platform.python_version(), "pandas": pd.__version__,
                 "numpy": np.__version__, "scikit_learn": sklearn.__version__}
     artifact = {"model": model, "features": features, "mode": args.mode,
+                "preprocessing_version": 1,
                 "dataset": DATASET, "versions": versions, "seed": args.seed}
-    joblib.dump(artifact, out / "modelo_ids.joblib", compress=3)
+    save_model(artifact, model_path)
     write_json(out / "metricas.json", scores)
     write_json(out / "reporte_clases.json", report)
     write_json(out / "auditoria.json", {**audit, "arguments": vars(args) | {"func": args.func.__name__},
