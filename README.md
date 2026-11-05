@@ -252,7 +252,18 @@ de nuevo el modelo. Cargue únicamente modelos joblib de fuentes confiables.
 ## 6. Verificación local
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest -v
+```
+
+Pytest ejecuta las pruebas existentes de integración y contratos, además de
+casos parametrizados de límites de puertos/protocolo, etiquetas inválidas,
+limpieza numérica, lectura por bloques y errores de argumentos de la CLI.
+Los archivos temporales se crean durante las pruebas y no requieren Kaggle,
+credenciales ni conexión a internet. Para ejecutar solo los contratos:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_contracts.py tests/test_contract_boundaries.py -v
 ```
 
 Las pruebas usan datos sintéticos pequeños para verificar el funcionamiento;

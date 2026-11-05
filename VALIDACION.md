@@ -1,5 +1,19 @@
 # Validación realizada
 
+## Suite pytest — 4 de noviembre de 2026
+
+Se ejecutó `.venv\Scripts\python.exe -m pytest -v` en Windows, con
+Python 3.13.7 y pytest 9.2.0: **36 pruebas aprobadas en 15,60 segundos**.
+La suite incluye los siete casos previos y 29 casos nuevos parametrizados
+o unitarios para la CLI, limpieza numérica, lectura por bloques, encabezados,
+límites de puertos/protocolo y etiquetas inválidas.
+Se verifican también entrenamiento binario/multiclase, persistencia del modelo,
+predicción, rechazo de esquemas inválidos, errores LAZY y conservación de
+la salida anterior ante un bloque inválido. Se emplean CSV sintéticos locales.
+Se registró un FutureWarning interno de Pandera/pandas al reunir errores;
+no hubo fallos. Las dependencias de pruebas están en `requirements-dev.txt`
+y el descubrimiento de pruebas está configurado en `pytest.ini`.
+
 ## Contrato Pandera y validación LAZY — 4 de noviembre de 2026
 
 Con Pandera 0.34.1 en el entorno Windows de la versión modular, pasaron las
